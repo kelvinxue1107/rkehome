@@ -1,0 +1,85 @@
+---
+- name: Centralize configuration and Update packages
+  hosts: k8s
+  become: yes
+  vars:
+    ansible_ssh_extra_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+  tasks:
+    - name: Ensure OS is updated
+      yum:
+        name: '*'
+        state: latest
+    - name: Ensure firewalld is disabled and stopped
+      service:
+        name: firewalld
+        state: stopped
+        enabled: no
+    - name: Create NetworkManager config
+      copy:
+        dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+        content: |
+          [keyfile]
+          unmanaged-devices=interface-name:cali*;interface-name:flannel*
+        owner: root
+        group: root
+        mode: '0644'
+#    - name: Add entries to /etc/hosts
+#      lineinfile:
+#        path: /etc/hosts
+#        line: "{{ item }}"
+#      loop:
+#        - "192.168.1.138 ranc01"
+#        - "192.168.1.176 node01"
+#        - "192.168.1.161 node02"
+#        - "192.168.1.147 node03"
+
+- name: Setup Controller Nodes
+  hosts: k8s-controller
+  become: yes
+  vars:
+    ansible_ssh_extra_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+  tasks:
+    - name: Download and install RKE2
+      shell: |
+        curl -sfL https://get.rke2.io | sh -
+    - name: Enable and start rke2-server service
+      systemd:
+        name: rke2-server
+        state: started
+        enabled: yes
+    - name: Fetch token from controller node
+      fetch:
+        src: /var/lib/rancher/rke2/server/node-token
+        dest: /tmp/node-token
+        flat: yes
+- name: Setup Worker Nodes
+  hosts: k8s-worker
+  become: yes
+  vars:
+    ansible_ssh_extra_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+    token: "{{ lookup('file', '/tmp/node-token') }}"
+  tasks:
+    - name: Download and install RKE2
+      shell: |
+        curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE="agent" sh -
+    - name: Enable and start rke2-server service
+      systemd:
+        name: rke2-agent
+        enabled: yes
+    - name: Create directory
+      file:
+        path: /etc/rancher/rke2
+        state: directory
+    - name: Create config file
+      copy:
+        dest: /etc/rancher/rke2/config.yaml
+        content: |
+          server: https://rancher.dockr.life:9345
+          token: {{ token }}
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Enable and start rke2-server service
+      systemd:
+        name: rke2-agent
+        state: started
