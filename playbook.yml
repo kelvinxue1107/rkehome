@@ -23,15 +23,6 @@
         owner: root
         group: root
         mode: '0644'
-#    - name: Add entries to /etc/hosts
-#      lineinfile:
-#        path: /etc/hosts
-#        line: "{{ item }}"
-#      loop:
-#        - "192.168.1.138 ranc01"
-#        - "192.168.1.176 node01"
-#        - "192.168.1.161 node02"
-#        - "192.168.1.147 node03"
 
 - name: Setup Controller Nodes
   hosts: k8s-controller
