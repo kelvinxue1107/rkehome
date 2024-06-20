@@ -1,0 +1,48 @@
+- name: Install RKE2 on Rocky Linux 9
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Ensure necessary packages are installed
+    ansible.builtin.yum:
+      name:
+      - curl
+      - sudo
+      state: present
+
+  - name: Install RKE2 server
+    ansible.builtin.shell: |
+      curl -sfL https://get.rke2.io | sh -
+    args:
+      creates: /usr/local/bin/rke2
+
+  - name: Enable and start RKE2 server service
+    ansible.builtin.systemd:
+      name: rke2-server
+      enabled: yes
+      state: started
+
+  - name: Create configuration directory
+    ansible.builtin.file:
+      path: /etc/rancher/rke2
+      state: directory
+
+  - name: Create RKE2 config file
+    ansible.builtin.copy:
+      dest: /etc/rancher/rke2/config.yaml
+      content: |
+        server: https://<server>:9345
+        token: <token>
+
+  - name: Enable and start RKE2 agent service
+    ansible.builtin.systemd:
+      name: rke2-agent
+      enabled: yes
+      state: started
+
+  - name: Follow RKE2 server logs
+    ansible.builtin.shell: |
+      journalctl -u rke2-server -f
+    async: 0
+    poll: 0
+    ignore_errors: yes
