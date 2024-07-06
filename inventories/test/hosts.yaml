@@ -1,0 +1,25 @@
+all:
+  vars:
+    ansible_ssh_extra_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+    ansible_ssh_private_key_file: /Users/kelvinx/.ssh/id_rsa
+  children:
+    mgmt:
+      children:
+        c01:
+          hosts: 192.168.1.161
+    cluster:
+      children:
+        master:
+          children:
+            m01:
+              hosts: 192.168.1.185
+            m02:
+              hosts: 192.168.1.104
+        worker:
+          children:
+            w01:
+              hosts: 192.168.1.109
+            w02:
+              hosts: 192.168.1.236
+            w03:
+              hosts: 192.168.1.249
