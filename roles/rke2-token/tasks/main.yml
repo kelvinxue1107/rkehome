@@ -1,0 +1,15 @@
+---
+- name: capature token
+  ansible.builtin.command:
+    cat /var/lib/rancher/rke2/server/node-token
+  register: rke_token 
+- name: register token for node connection
+  set_fact:
+    agent_token: "{{ rke_token.stdout }}"
+- name: Share the agent_token with all hosts
+  add_host:
+    name: shared_token
+    agent_token: "{{ agent_token }}"
+- name: display TOKEN for debug
+  debug:
+    msg: "this is the token {{ agent_token }}" # not required. The customized message that is printed. If omitted, prints a generic message.
