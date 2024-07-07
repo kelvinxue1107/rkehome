@@ -16,17 +16,15 @@
 - name: upgrade helm
   ansible.builtin.shell: |
     export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-    /usr/local/bin/helm upgrade -i cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace
+    /usr/local/bin/helm upgrade -i cert-manager jetstack/cert-manager --create-namespace --namespace cert-manager 
 
 - name: Install rancher
   shell: |
     export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancher.dockr.life --set bootstrapPassword=bootStrapAllTheThings --set replicas=1
-  register: rancher-log
+    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancherhome.local --set replicas=1
+#    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancherhome.local --set bootstrapPassword=bootStrapAllTheThings --set replicas=1
 
-- name: display TOKEN for debug
-  debug:
-    msg: "{{ rancher-log }}" # not required. The customized message that is printed. If omitted, prints a generic message.
+# not required. The customized message that is printed. If omitted, prints a generic message.
 #- name: Install helm chart
 #  kubernetes.core.helm:
 #    host: mgmt
