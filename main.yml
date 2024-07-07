@@ -14,6 +14,11 @@
         regexp: '^127\.0\.0\.1\s+'
         line: "127.0.0.1 {{ inventory_hostname }}"
         state: present
+    - name: Add rancherhome.local to /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: '192.168.1.161 rancherhome.local'
+        state: present
     - name: Ensure /etc/hostname has the correct hostname
       lineinfile:
         path: /etc/hostname
@@ -27,11 +32,50 @@
       vars:
         dns_ip: "192.168.1.161"
         dns_hostname: "rancherhome.local"
+    - name: Ensure firewalld is installed and running
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Configure firewalld rules
+      ansible.builtin.firewalld:
+        zone: public
+        port: "{{ item.port }}/{{ item.protocol }}"
+#        source: "{{ item.source }}"
+        state: enabled
+        permanent: yes
+      loop:
+        - { protocol: 'tcp', port: '9345'} # Replace with actual source
+        - { protocol: 'tcp', port: '6443'} # Replace with actual source
+        - { protocol: 'udp', port: '8472'} # Replace with actual source
+        - { protocol: 'tcp', port: '10250' } # Replace with actual source
+        - { protocol: 'tcp', port: '2379'} # Replace with actual source
+        - { protocol: 'tcp', port: '2380'} # Replace with actual source
+        - { protocol: 'tcp', port: '2381'} # Replace with actual source
+        - { protocol: 'tcp', port: '30000-32767'} # Replace with actual source
+        - { protocol: 'udp', port: '8472' } # Replace with actual source
+        - { protocol: 'tcp', port: '4240' } # Replace with actual source
+#        - { protocol: 'icmp', port: '8/0' } # Replace with actual source
+        - { protocol: 'tcp', port: '179'  } # Replace with actual source
+        - { protocol: 'udp', port: '4789' } # Replace with actual source
+        - { protocol: 'tcp', port: '5473' } # Replace with actual source
+        - { protocol: 'tcp', port: '9098' } # Replace with actual source
+        - { protocol: 'tcp', port: '9099' } # Replace with actual source
+        - { protocol: 'udp', port: '8472' } # Replace with actual source
+        - { protocol: 'tcp', port: '9099' } # Replace with actual source
+        - { protocol: 'udp', port: '51820' } # Replace with actual source
+        - { protocol: 'udp', port: '51821' } # Replace with actual source
+        - { protocol: 'udp', port: '4789' } # Replace with actual source
+
+    - name: Reload firewalld
+      ansible.builtin.command: firewall-cmd --reload
+      become: yes
   tags: infra
 - name: Provision RKE2 controller
   gather_facts: yes
   hosts: mgmt
-  become: true
+  become: yes
   roles:
     - rke2-master # required. The name of the role to be executed.
   tags:
@@ -40,17 +84,8 @@
 - name: register token
   hosts: mgmt
   become: true
-  tasks: 
-    - name: capature token
-      ansible.builtin.command:
-        cat /var/lib/rancher/rke2/server/node-token
-      register: rke_token 
-    - name: register token for node connection
-      set_fact:
-        agent_token: "{{ rke_token.stdout }}"
-    - name: display TOKEN for debug
-      debug:
-        msg: "this is the token {{ agent_token }}" # not required. The customized message that is printed. If omitted, prints a generic message.
+  roles:
+    - rke2-token
   tags:
     - never
     - token
@@ -58,11 +93,38 @@
   gather_facts: yes
   serial: 1
   hosts: cluster
-  become: true
-  vars:
-    agents_token: "{{ agent_token }}"
+  become: yes
   roles:
     - rke2-client
+  tasks:
+    - name: Create RKE2 config file
+      ansible.builtin.copy:
+        dest: /etc/rancher/rke2/config.yaml
+        content: |
+          server: https://192.168.1.161:9345
+          token: {{ hostvars['shared_token'].agent_token }}
+    - name: Enable RKE2 agent service
+      ansible.builtin.systemd:
+        name: rke2-agent
+        enabled: yes
+    - name: Start RKE2 agent service
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: started
+    - name: Rstart RKE2 agent service
+      ansible.builtin.systemd:
+        name: rke2-agent
+        state: restarted
+        daemon_reload: yes
   tags: 
     - never
     - agent
+
+- name: Provision HELM on RKE2 server
+  gather_facts: yes
+  serial: 1
+  hosts: mgmt
+  become: yes
+  roles:
+    - rke2-helm
+  tags: [never,helm]
