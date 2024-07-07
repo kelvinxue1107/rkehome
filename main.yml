@@ -1,4 +1,12 @@
 ---
+- name: Configure ip_v4
+  gather_facts: yes
+  hosts: all
+  become: yes
+  roles:
+    - rke2-infra
+  tags: [never,ipv4]
+  
 - name: Update infra configuration
   gather_facts: yes
   become: true
