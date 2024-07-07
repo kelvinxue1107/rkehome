@@ -1,0 +1,41 @@
+- name: Get GIT as pre-requirement
+  yum:
+    name: git # not required. A package name or package specifier with version, like C(name-1.0). If a previous version is specified, the task also needs to turn C(allow_downgrade) on. See the C(allow_downgrade) documentation for caveats with downgrading packages. When using state=latest, this can be C('*') which means run C(yum -y update). You can also pass a url or a local path to a rpm file (using state=present). To operate on several packages this can accept a comma separated string of packages or (as of 2.0) a list of packages.
+    state: present # not required. choices: absent;installed;latest;present;removed. Whether to install (C(present) or C(installed), C(latest)), or remove (C(absent) or C(removed)) a package. C(present) and C(installed) will simply ensure that a desired package is installed. C(latest) will update the specified package if it's not of the latest available version. C(absent) and C(removed) will remove the specified package. Default is C(None), however in effect the default action is C(present) unless the C(autoremove) option is enabled for this module, then C(absent) is inferred.
+- name: Get helm
+  ansible.builtin.shell:
+    curl -#L https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  ignore_errors: yes
+- name: add needed helm charts
+  ansible.builtin.shell: |
+    /usr/local/bin/helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
+    /usr/local/bin/helm repo add jetstack https://charts.jetstack.io
+- name: apply rke2 cert-manager
+  ansible.builtin.shell: 
+    /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.crds.yaml
+- name: upgrade helm
+  ansible.builtin.shell: |
+    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+    /usr/local/bin/helm upgrade -i cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace
+
+- name: Install rancher
+  shell: |
+    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancher.dockr.life --set bootstrapPassword=bootStrapAllTheThings --set replicas=1
+  register: rancher-log
+
+- name: display TOKEN for debug
+  debug:
+    msg: "{{ rancher-log }}" # not required. The customized message that is printed. If omitted, prints a generic message.
+#- name: Install helm chart
+#  kubernetes.core.helm:
+#    host: mgmt
+#    chart:
+#      name: memcached
+#      version: 0.4.0
+#      source:
+#        type: repo
+#        location: https://kubernetes-charts.storage.googleapis.com
+#    state: present
+#    name: my-memcached
+#    namespace: default
