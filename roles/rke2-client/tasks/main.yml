@@ -4,11 +4,6 @@
     curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE="agent" sh -
   args:
     creates: /usr/local/bin/rke2
-- name: Enable and start RKE2 agent service
-  ansible.builtin.systemd:
-    name: rke2-agent
-    enabled: yes
-    state: started
 - name: Create configuration directory
   ansible.builtin.file:
     path: /etc/rancher/rke2
@@ -18,4 +13,9 @@
     dest: /etc/rancher/rke2/config.yaml
     content: |
       server: https://192.168.1.161:9345
-      token: <token>
+      token: "{{ agents_token }}"
+- name: Enable and start RKE2 agent service
+  ansible.builtin.systemd:
+    name: rke2-agent
+    enabled: yes
+    state: started

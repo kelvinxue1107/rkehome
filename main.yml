@@ -1,25 +1,68 @@
 ---
 - name: Update infra configuration
   gather_facts: yes
+  become: true
   hosts: all
-  
+  serial: 1 # will stop once getting error
+  tasks:
+    - name: Set the hostname
+      hostname:
+        name: "{{ inventory_hostname }}"  
+    - name: Ensure /etc/hosts has the correct hostname
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.0\.1\s+'
+        line: "127.0.0.1 {{ inventory_hostname }}"
+        state: present
+    - name: Ensure /etc/hostname has the correct hostname
+      lineinfile:
+        path: /etc/hostname
+        line: "{{ inventory_hostname }}"
+        state: present
+    - name: Add DNS record to /etc/hosts
+      lineinfile:
+        path: /etc/resolv.conf
+        state: present
+        line: "{{ dns_hostname }} {{ dns_ip }} "
+      vars:
+        dns_ip: "192.168.1.161"
+        dns_hostname: "rancherhome.local"
+  tags: infra
 - name: Provision RKE2 controller
   gather_facts: yes
   hosts: mgmt
   become: true
   roles:
     - rke2-master # required. The name of the role to be executed.
+  tags:
+    - never
+    - master
 - name: register token
   hosts: mgmt
   become: true
   tasks: 
     - name: capature token
+      ansible.builtin.command:
+        cat /var/lib/rancher/rke2/server/node-token
+      register: rke_token 
     - name: register token for node connection
-      register:
+      set_fact:
+        agent_token: "{{ rke_token.stdout }}"
+    - name: display TOKEN for debug
+      debug:
+        msg: "this is the token {{ agent_token }}" # not required. The customized message that is printed. If omitted, prints a generic message.
+  tags:
+    - never
+    - token
 - name: Provision RKE2 agent
   gather_facts: yes
   serial: 1
   hosts: cluster
   become: true
+  vars:
+    agents_token: "{{ agent_token }}"
   roles:
-    - rke2-agent
+    - rke2-client
+  tags: 
+    - never
+    - agent

@@ -15,3 +15,7 @@
     name: rke2-server
     enabled: yes
     state: started
+- name: restart RKE2 server service
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: restarted

@@ -6,20 +6,32 @@ all:
     mgmt:
       children:
         c01:
-          hosts: 192.168.1.161
+          hosts: rke2-con01
+          vars:
+            ansible_host: 192.168.1.161
     cluster:
       children:
         master:
           children:
             m01:
-              hosts: 192.168.1.185
+              hosts: rke2-mas01
+              vars:
+                ansible_host: 192.168.1.185
             m02:
-              hosts: 192.168.1.104
+              hosts: rke2-mas02
+              vars:
+                ansible_host: 192.168.1.104
         worker:
           children:
             w01:
-              hosts: 192.168.1.109
+              hosts: rke2-wrk01
+              vars:
+                ansible_host: 192.168.1.109
             w02:
-              hosts: 192.168.1.236
+              hosts: rke2-wrk02
+              vars:
+                ansible_host: 192.168.1.236
             w03:
-              hosts: 192.168.1.249
+              hosts: rke2-wrk03
+              vars:
+                ansible_host: 192.168.1.249
