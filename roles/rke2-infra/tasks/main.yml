@@ -13,3 +13,113 @@
     sysctl_set: true
     state: present
     reload: true
+
+- name: disable SELINUX
+  ansible.builtin.lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: "SELINUX=disabled"
+    state: present
+
+- name: disable SWAP
+  ansible.builtin.shell: |
+    swapoff -a
+    sysctl -w vm.swappiness=0
+
+
+- name: Stop and disable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: stopped
+    enabled: no
+
+- name: Disable SELinux in config file
+  ansible.builtin.lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: 'SELINUX=disabled'
+    
+- name: Set SELinux to permissive mode
+  ansible.builtin.shell: "getenforce 0"
+- name: Comment out swap entries in fstab
+  ansible.builtin.shell: "sed -i '/.*swap.*/s/^/#/' /etc/fstab"
+- name: Disable swap
+  ansible.builtin.shell: "swapoff -a && sysctl -w vm.swappiness=0"
+- name: Set file and process limits
+  ansible.builtin.lineinfile:
+    path: /etc/security/limits.conf
+    line: |
+      * soft nofile 655360
+      * hard nofile 131072
+      * soft nproc 655350
+      * hard nproc 655350
+      * soft memlock unlimited
+      * hard memlock unlimited
+- name: Create modules-load.d directory
+  ansible.builtin.file:
+    path: /etc/modules-load.d
+    state: directory
+- name: Create ipvs.conf file
+  ansible.builtin.file:
+    path: /etc/modules-load.d/ipvs.conf
+    state: touch
+    mode: '0644'
+- name: Add modules to rc.local
+  ansible.builtin.lineinfile:
+    path: /etc/rc.local
+    line: |
+      modprobe br_netfilter
+      modprobe ip_conntrack
+- name: Restart systemd-modules-load service
+  ansible.builtin.systemd:
+    name: systemd-modules-load.service
+    state: restarted
+- name: Load necessary modules
+  ansible.builtin.shell: "modprobe bridge && modprobe br_netfilter && modprobe ip_conntrack"
+- name: Create k8s.conf file
+  ansible.builtin.file:
+    path: /etc/sysctl.d/k8s.conf
+    state: touch
+    mode: '0644'
+- name: Configure sysctl parameters
+  ansible.builtin.blockinfile:
+    path: /etc/sysctl.d/k8s.conf
+    block: |
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      vm.overcommit_memory = 1
+      vm.panic_on_oom = 0
+      fs.inotify.max_user_watches = 89100
+      fs.file-max = 52706963
+      fs.nr_open = 52706963
+      net.netfilter.nf_conntrack_max = 2310720
+      net.ipv4.tcp_keepalive_time = 600
+      net.ipv4.tcp_keepalive_probes = 3
+      net.ipv4.tcp_keepalive_intvl = 15
+      net.ipv4.tcp_max_tw_buckets = 36000
+      net.ipv4.tcp_tw_reuse = 1
+      net.ipv4.tcp_max_orphans = 327680
+      net.ipv4.tcp_orphan_retries = 3
+      net.ipv4.tcp_syncookies = 1
+      net.ipv4.tcp_max_syn_backlog = 16384
+      net.ipv4.tcp_timestamps = 0
+      net.core.somaxconn = 16384
+      net.ipv6.conf.all.disable_ipv6 = 0
+      net.ipv6.conf.default.disable_ipv6 = 0
+      net.ipv6.conf.lo.disable_ipv6 = 0
+      net.ipv6.conf.all.forwarding = 1
+- name: Apply sysctl parameters
+  ansible.builtin.shell: "sysctl -p /etc/sysctl.d/k8s.conf"
+- name: Create rke2-canal.conf file
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d/rke2-canal.conf
+    state: touch
+    mode: '0644'
+- name: Configure NetworkManager unmanaged devices
+  ansible.builtin.blockinfile:
+    path: /etc/NetworkManager/conf.d/rke2-canal.conf
+    block: |
+      [keyfile]
+      unmanaged-devices=interface-name:cali*;interface-name:flannel*
+- name: Reload and restart NetworkManager
+  ansible.builtin.shell: "systemctl reload NetworkManager && systemctl daemon-reload && systemctl restart NetworkManager"

@@ -1,12 +1,25 @@
 ---
 - name: Configure ip_v4
   gather_facts: yes
-  hosts: all
+  hosts: '{{ target_vm }}'
   become: yes
   roles:
     - rke2-infra
   tags: [never,ipv4]
-  
+
+- name: Update infra configuration
+  gather_facts: yes
+  become: true
+  hosts: all
+  serial: 1 # will stop once getting error
+  tasks:
+    - name: remove rancherhome.local in /etc/resolv.conf
+      lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^rancherhome*'
+        state: absent
+  tags: [never,adhoc]
+
 - name: Update infra configuration
   gather_facts: yes
   become: true
@@ -15,12 +28,19 @@
   tasks:
     - name: Set the hostname
       hostname:
-        name: "{{ inventory_hostname }}"  
+        name: "{{ inventory_hostname }}"
+
     - name: Ensure /etc/hosts has the correct hostname
       lineinfile:
         path: /etc/hosts
         regexp: '^127\.0\.0\.1\s+'
         line: "127.0.0.1 {{ inventory_hostname }}"
+        state: present
+    - name: Update domain Ensure /etc/resolv.conf has the correct hostname
+      lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^search*'
+        line: "search lan rancherhome.local"
         state: present
     - name: Add rancherhome.local to /etc/hosts
       ansible.builtin.lineinfile:
@@ -32,14 +52,14 @@
         path: /etc/hostname
         line: "{{ inventory_hostname }}"
         state: present
-    - name: Add DNS record to /etc/hosts
+    - name: Add DNS record to /etc/resolv.conf
       lineinfile:
         path: /etc/resolv.conf
         state: present
         line: "{{ dns_hostname }} {{ dns_ip }} "
       vars:
         dns_ip: "192.168.1.161"
-        dns_hostname: "rancherhome.local"
+        dns_hostname: "nameserver"
     - name: Ensure firewalld is installed and running
       ansible.builtin.service:
         name: firewalld
@@ -79,7 +99,7 @@
     - name: Reload firewalld
       ansible.builtin.command: firewall-cmd --reload
       become: yes
-  tags: infra
+  tags: [never,infra]
 - name: Provision RKE2 controller
   gather_facts: yes
   hosts: mgmt
