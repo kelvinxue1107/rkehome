@@ -10,19 +10,24 @@
   ansible.builtin.shell: |
     /usr/local/bin/helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
     /usr/local/bin/helm repo add jetstack https://charts.jetstack.io
+- name: Update helm repo
+  ansible.builtin.shell: |
+    /usr/local/bin/helm repo update
+#    /usr/local/bin/helm install rancher-helm-chart
+
 - name: apply rke2 cert-manager
   ansible.builtin.shell: 
     /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml apply -f https://github.com/jetstack/cert-manager/releases/download/v1.6.1/cert-manager.crds.yaml
-- name: upgrade helm
-  ansible.builtin.shell: |
-    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-    /usr/local/bin/helm upgrade -i cert-manager jetstack/cert-manager --create-namespace --namespace cert-manager 
+#- name: upgrade helm
+#  ansible.builtin.shell: |
+#    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+#    /usr/local/bin/helm upgrade -i cert-manager jetstack/cert-manager --create-namespace --namespace cert-manager 
 
 - name: Install rancher
   shell: |
     export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancherhome.local --set replicas=1
-#    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancherhome.local --set bootstrapPassword=bootStrapAllTheThings --set replicas=1
+    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace downstream-cluster --set hostname=rancherhome.local --set bootstrapPassword=bootStrapAllTheThings --set replicas=1
+#    /usr/local/bin/helm upgrade -i rancher rancher-latest/rancher --create-namespace --namespace cattle-system --set hostname=rancherhome.local --set bootstrapPassword=bootStrapAllTheThings --set replicas=1
 
 # not required. The customized message that is printed. If omitted, prints a generic message.
 #- name: Install helm chart
